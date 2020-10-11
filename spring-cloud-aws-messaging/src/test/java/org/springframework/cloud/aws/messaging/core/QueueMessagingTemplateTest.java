@@ -142,6 +142,23 @@ class QueueMessagingTemplateTest {
 	}
 
 	@Test
+	void receive_withDefaultDestinationAndTimeout_useDefaultDestinationAndTimeout() {
+		AmazonSQSAsync amazonSqs = createAmazonSqs();
+		QueueMessagingTemplate queueMessagingTemplate = new QueueMessagingTemplate(
+				amazonSqs);
+		queueMessagingTemplate.setDefaultTimeout(10L);
+		queueMessagingTemplate.setDefaultDestinationName("my-queue");
+
+		queueMessagingTemplate.receive();
+
+		ArgumentCaptor<ReceiveMessageRequest> sendMessageRequestArgumentCaptor = ArgumentCaptor
+				.forClass(ReceiveMessageRequest.class);
+		verify(amazonSqs).receiveMessage(sendMessageRequestArgumentCaptor.capture());
+		assertThat(sendMessageRequestArgumentCaptor.getValue().getQueueUrl())
+				.isEqualTo("https://queue-url.com");
+	}
+
+	@Test
 	void receive_withDestination_usesDestination() {
 		AmazonSQSAsync amazonSqs = createAmazonSqs();
 		QueueMessagingTemplate queueMessagingTemplate = new QueueMessagingTemplate(

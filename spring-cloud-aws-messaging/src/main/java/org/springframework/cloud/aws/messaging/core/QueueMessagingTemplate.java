@@ -50,6 +50,8 @@ public class QueueMessagingTemplate
 
 	private final AmazonSQSAsync amazonSqs;
 
+	private long defaultTimeout = Long.MIN_VALUE;
+
 	public QueueMessagingTemplate(AmazonSQSAsync amazonSqs) {
 		this(amazonSqs, (ResourceIdResolver) null, null);
 	}
@@ -65,9 +67,9 @@ public class QueueMessagingTemplate
 	 * the default configuration to resolve destination names.
 	 * @param amazonSqs The {@link AmazonSQS} client, cannot be {@code null}.
 	 * @param resourceIdResolver The {@link ResourceIdResolver} to be used for resolving
-	 * logical queue names.
+	 *     logical queue names.
 	 * @param messageConverter A {@link MessageConverter} that is going to be added to the
-	 * composite converter.
+	 *     composite converter.
 	 */
 	public QueueMessagingTemplate(AmazonSQSAsync amazonSqs,
 			ResourceIdResolver resourceIdResolver, MessageConverter messageConverter) {
@@ -82,11 +84,11 @@ public class QueueMessagingTemplate
 	 * the default configuration to resolve destination names.
 	 * @param amazonSqs The {@link AmazonSQS} client, cannot be {@code null}.
 	 * @param destinationResolver A destination resolver implementation to resolve queue
-	 * names into queue urls. The destination resolver will be wrapped into a
-	 * {@link org.springframework.messaging.core.CachingDestinationResolverProxy} to avoid
-	 * duplicate queue url resolutions.
+	 *     names into queue urls. The destination resolver will be wrapped into a
+	 *     {@link org.springframework.messaging.core.CachingDestinationResolverProxy} to
+	 *     avoid duplicate queue url resolutions.
 	 * @param messageConverter A {@link MessageConverter} that is going to be added to the
-	 * composite converter.
+	 *     composite converter.
 	 */
 	public QueueMessagingTemplate(AmazonSQSAsync amazonSqs,
 			DestinationResolver<String> destinationResolver,
@@ -96,10 +98,19 @@ public class QueueMessagingTemplate
 		initMessageConverter(messageConverter);
 	}
 
+	public Long getDefaultTimeout() {
+		return this.defaultTimeout;
+	}
+
+	public void setDefaultTimeout(Long defaultTimeout) {
+		this.defaultTimeout = defaultTimeout != null ? defaultTimeout : Long.MIN_VALUE;
+	}
+
 	@Override
 	protected QueueMessageChannel resolveMessageChannel(
 			String physicalResourceIdentifier) {
-		return new QueueMessageChannel(this.amazonSqs, physicalResourceIdentifier);
+		return new QueueMessageChannel(this.amazonSqs, physicalResourceIdentifier,
+				getDefaultTimeout());
 	}
 
 	@Override
@@ -132,7 +143,8 @@ public class QueueMessagingTemplate
 
 	@Override
 	public Message<?> receive(String destinationName) throws MessagingException {
-		return resolveMessageChannelByLogicalName(destinationName).receive();
+		return resolveMessageChannelByLogicalName(destinationName)
+				.receive(getDefaultTimeout());
 	}
 
 	@Override

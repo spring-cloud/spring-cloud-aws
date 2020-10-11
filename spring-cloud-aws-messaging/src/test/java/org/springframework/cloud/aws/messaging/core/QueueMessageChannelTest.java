@@ -167,7 +167,7 @@ class QueueMessageChannelTest {
 		// Arrange
 		AmazonSQSAsync amazonSqs = mock(AmazonSQSAsync.class);
 		when(amazonSqs.receiveMessage(new ReceiveMessageRequest("http://testQueue")
-				.withWaitTimeSeconds(0).withMaxNumberOfMessages(1)
+				.withMaxNumberOfMessages(1)
 				.withAttributeNames(QueueMessageChannel.ATTRIBUTE_NAMES)
 				.withMessageAttributeNames("All")))
 						.thenReturn(new ReceiveMessageResult().withMessages(Collections
@@ -249,6 +249,50 @@ class QueueMessageChannelTest {
 	}
 
 	@Test
+	void receiveMessage_withoutDefaultTimeoutAndOverride_returnsNull() throws Exception {
+		// Arrange
+		AmazonSQSAsync amazonSqs = mock(AmazonSQSAsync.class);
+		when(amazonSqs.receiveMessage(
+				new ReceiveMessageRequest("http://testQueue").withMaxNumberOfMessages(1)
+						.withAttributeNames(QueueMessageChannel.ATTRIBUTE_NAMES)
+						.withMessageAttributeNames("All")))
+								.thenReturn(new ReceiveMessageResult()
+										.withMessages(Collections.emptyList()));
+
+		PollableChannel messageChannel = new QueueMessageChannel(amazonSqs,
+				"http://testQueue");
+
+		// Act
+		Message<?> receivedMessage = messageChannel.receive();
+
+		// Assert
+		assertThat(receivedMessage).isNull();
+	}
+
+	@Test
+	void receiveMessage_withDefaultTimeout_returnsTextMessage() throws Exception {
+		// Arrange
+		AmazonSQSAsync amazonSqs = mock(AmazonSQSAsync.class);
+		when(amazonSqs.receiveMessage(new ReceiveMessageRequest("http://testQueue")
+				.withMaxNumberOfMessages(1).withWaitTimeSeconds(10)
+				.withAttributeNames(QueueMessageChannel.ATTRIBUTE_NAMES)
+				.withMessageAttributeNames("All")))
+						.thenReturn(new ReceiveMessageResult().withMessages(Collections
+								.singleton(new com.amazonaws.services.sqs.model.Message()
+										.withBody("content"))));
+
+		PollableChannel messageChannel = new QueueMessageChannel(amazonSqs,
+				"http://testQueue", 10);
+
+		// Act
+		Message<?> receivedMessage = messageChannel.receive();
+
+		// Assert
+		assertThat(receivedMessage).isNotNull();
+		assertThat(receivedMessage.getPayload()).isEqualTo("content");
+	}
+
+	@Test
 	void receiveMessage_withMimeTypeMessageAttribute_shouldCopyToHeaders()
 			throws Exception {
 		// Arrange
@@ -271,7 +315,7 @@ class QueueMessageChannelTest {
 				"http://testQueue");
 
 		// Act
-		Message<?> receivedMessage = messageChannel.receive();
+		Message<?> receivedMessage = messageChannel.receive(0);
 
 		// Assert
 		assertThat(receivedMessage.getHeaders().get(MessageHeaders.CONTENT_TYPE))
@@ -331,7 +375,7 @@ class QueueMessageChannelTest {
 				"http://testQueue");
 
 		// Act
-		Message<?> receivedMessage = messageChannel.receive();
+		Message<?> receivedMessage = messageChannel.receive(0);
 
 		// Assert
 		assertThat(receivedMessage.getHeaders().get(headerName)).isEqualTo(headerValue);
@@ -471,7 +515,7 @@ class QueueMessageChannelTest {
 				"http://testQueue");
 
 		// Act
-		Message<?> receivedMessage = messageChannel.receive();
+		Message<?> receivedMessage = messageChannel.receive(0);
 
 		// Assert
 		assertThat(receivedMessage.getHeaders().get("double")).isEqualTo(doubleValue);
@@ -513,7 +557,7 @@ class QueueMessageChannelTest {
 				"http://testQueue");
 
 		// Assert
-		assertThatThrownBy(messageChannel::receive)
+		assertThatThrownBy(() -> messageChannel.receive(0))
 				.isInstanceOf(IllegalArgumentException.class).hasMessageContaining(
 						"Cannot convert String [17] to target class [java.util.concurrent.atomic.AtomicInteger]");
 	}
@@ -544,8 +588,8 @@ class QueueMessageChannelTest {
 				"http://testQueue");
 
 		// Assert
-		assertThatThrownBy(messageChannel::receive).isInstanceOf(MessagingException.class)
-				.hasMessageContaining(
+		assertThatThrownBy(() -> messageChannel.receive(0))
+				.isInstanceOf(MessagingException.class).hasMessageContaining(
 						"Message attribute with value '12' and data type 'Number.class.not.Found' could not be converted"
 								+ " into a Number because target class was not found.");
 	}
@@ -603,7 +647,7 @@ class QueueMessageChannelTest {
 				"http://testQueue");
 
 		// Act
-		Message<?> receivedMessage = messageChannel.receive();
+		Message<?> receivedMessage = messageChannel.receive(0);
 
 		// Assert
 		assertThat(receivedMessage.getHeaders().get(headerName)).isEqualTo(headerValue);
@@ -654,7 +698,7 @@ class QueueMessageChannelTest {
 				"http://testQueue");
 
 		// Act
-		Message<?> receivedMessage = messageChannel.receive();
+		Message<?> receivedMessage = messageChannel.receive(0);
 
 		// Assert
 		Object idMessageHeader = receivedMessage.getHeaders().get(MessageHeaders.ID);

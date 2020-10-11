@@ -60,9 +60,18 @@ public class QueueMessageChannel extends AbstractMessageChannel
 
 	private final String queueUrl;
 
+	private long defaultTimeout = Long.MIN_VALUE;
+
 	public QueueMessageChannel(AmazonSQSAsync amazonSqs, String queueUrl) {
 		this.amazonSqs = amazonSqs;
 		this.queueUrl = queueUrl;
+	}
+
+	public QueueMessageChannel(AmazonSQSAsync amazonSqs, String queueUrl,
+			long defaultTimeout) {
+		this.amazonSqs = amazonSqs;
+		this.queueUrl = queueUrl;
+		this.defaultTimeout = defaultTimeout;
 	}
 
 	private static boolean isSkipHeader(String headerName) {
@@ -172,8 +181,10 @@ public class QueueMessageChannel extends AbstractMessageChannel
 				this.logger.warn(String.format(
 						"Message header with name '%s' and type '%s' cannot be sent as"
 								+ " message attribute because it is not supported by SQS.",
-						messageHeaderName, messageHeaderValue != null
-								? messageHeaderValue.getClass().getName() : ""));
+						messageHeaderName,
+						messageHeaderValue != null
+								? messageHeaderValue.getClass().getName()
+								: ""));
 			}
 		}
 
@@ -219,17 +230,27 @@ public class QueueMessageChannel extends AbstractMessageChannel
 
 	@Override
 	public Message<String> receive() {
-		return this.receive(0);
+		return this.receive(defaultTimeout);
 	}
 
 	@Override
 	public Message<String> receive(long timeout) {
-		ReceiveMessageResult receiveMessageResult = this.amazonSqs.receiveMessage(
-				new ReceiveMessageRequest(this.queueUrl).withMaxNumberOfMessages(1)
-						.withWaitTimeSeconds(Long.valueOf(timeout).intValue())
-						.withAttributeNames(ATTRIBUTE_NAMES)
-						.withMessageAttributeNames(MESSAGE_ATTRIBUTE_NAMES));
-		if (receiveMessageResult.getMessages().isEmpty()) {
+		ReceiveMessageResult receiveMessageResult;
+		if (timeout == Long.MIN_VALUE) { /* use Queue default timeout */
+			receiveMessageResult = this.amazonSqs.receiveMessage(
+					new ReceiveMessageRequest(this.queueUrl).withMaxNumberOfMessages(1)
+							.withAttributeNames(ATTRIBUTE_NAMES)
+							.withMessageAttributeNames(MESSAGE_ATTRIBUTE_NAMES));
+		}
+		else {
+			receiveMessageResult = this.amazonSqs.receiveMessage(
+					new ReceiveMessageRequest(this.queueUrl).withMaxNumberOfMessages(1)
+							.withWaitTimeSeconds(Long.valueOf(timeout).intValue())
+							.withAttributeNames(ATTRIBUTE_NAMES)
+							.withMessageAttributeNames(MESSAGE_ATTRIBUTE_NAMES));
+		}
+		if (receiveMessageResult == null
+				|| receiveMessageResult.getMessages().isEmpty()) {
 			return null;
 		}
 		com.amazonaws.services.sqs.model.Message amazonMessage = receiveMessageResult
